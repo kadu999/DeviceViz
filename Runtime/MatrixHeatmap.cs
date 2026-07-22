@@ -6,7 +6,7 @@ namespace DeviceViz
 {
     /// <summary>
     /// Matrix heatmap coordinator — manages display mode and
-    /// coordinates ColorLayer, DigitLayer, TouchMarkerOverlay, and FadingStrokeLayer.
+    /// coordinates ColorLayer, DigitLayer, TouchMarkerLayer, and FadingStrokeLayer.
     /// </summary>
     public class MatrixHeatmap : MonoBehaviour
     {
@@ -25,6 +25,7 @@ namespace DeviceViz
         public ColorLayer colorLayer;
         public DigitLayer digitLayer;
         public FadingStrokeLayer fadingLayer;
+        public TouchMarkerLayer touchMarkerLayer;
 
         [Header("显示")]
         public DisplayMode displayMode = DisplayMode.Color | DisplayMode.Digits;
@@ -40,7 +41,6 @@ namespace DeviceViz
         private int _w, _h;
         private bool _built;
         private DisplayMode _prevMode;
-        private TouchMarkerOverlay _overlay;
 
     #if UNITY_EDITOR
         void OnValidate()
@@ -54,11 +54,8 @@ namespace DeviceViz
         void Awake()
         {
             _prevMode = displayMode;
-        }
-
-        void Start()
-        {
-            _overlay = new TouchMarkerOverlay(transform, 20);
+            if (touchMarkerLayer == null)
+                touchMarkerLayer = gameObject.AddComponent<TouchMarkerLayer>();
         }
 
         void Init(int w, int h)
@@ -123,7 +120,7 @@ namespace DeviceViz
         void UpdateTouches(PressureInfo[] touches)
         {
             if (displayMode.HasFlag(DisplayMode.TouchMarkers))
-                _overlay?.Update(touches, _w, _h);
+                touchMarkerLayer.UpdateTouches(touches, _w, _h);
             if (displayMode.HasFlag(DisplayMode.FadingStroke))
                 fadingLayer.UpdateTouches(touches, _w, _h);
         }
