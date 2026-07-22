@@ -1,0 +1,17 @@
+{
+    "name": "DeviceViz",
+    "rootNamespace": "DeviceViz",
+    "references": [
+        "Unity.InputSystem",
+        "DeviceDecoder"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
