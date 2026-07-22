@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.UI;
 
+namespace DeviceViz
+{
 public class TouchMarkerOverlay
 {
     readonly RectTransform[] _markers;
@@ -71,4 +73,5 @@ public class TouchMarkerOverlay
             return _circle;
         }
     }
+}
 }

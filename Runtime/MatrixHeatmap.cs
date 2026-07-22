@@ -2,6 +2,8 @@ using DeviceDecoder;
 using UnityEngine;
 using UnityEngine.UI;
 
+namespace DeviceViz
+{
 public class MatrixHeatmap : MonoBehaviour
 {
     [System.Flags]
@@ -286,4 +288,5 @@ public class MatrixHeatmap : MonoBehaviour
     }
 
     void OnDestroy() { Cleanup(); }
+}
 }

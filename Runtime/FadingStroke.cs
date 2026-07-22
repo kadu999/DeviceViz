@@ -10,6 +10,8 @@ using UnityEngine.UI;
 ///   fading.Emit(new Vector2(0.5f, 0.3f));
 ///   rawImage.texture = fading.texture;
 /// </summary>
+namespace DeviceViz
+{
 public class FadingStroke : MonoBehaviour
 {
     [Header("画板")]
@@ -143,4 +145,5 @@ public class FadingStroke : MonoBehaviour
         invFade       = 1f / fadeDuration;
     }
 #endif
+}
 }

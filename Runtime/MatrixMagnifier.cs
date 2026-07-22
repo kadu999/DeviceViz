@@ -6,6 +6,8 @@ using UnityEngine.InputSystem;
 /// 窗口拖拽缩放控件：直接引用一个 RectTransform，用滚轮缩放，放大才能拖动，缩回原位自动归位。
 /// 挂到 Canvas 下的空 GameObject 上，把要控制的窗口拖给 targetRT。
 /// </summary>
+namespace DeviceViz
+{
 public class MatrixMagnifier : MonoBehaviour
 {
     [Header("目标窗口")]
@@ -93,4 +95,5 @@ public class MatrixMagnifier : MonoBehaviour
     {
         return targetRT.sizeDelta.x > _originSize.x + 1 || targetRT.sizeDelta.y > _originSize.y + 1;
     }
+}
 }
