@@ -3,14 +3,12 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 消退绘制 — 纯渲染组件，不依赖任何 UI 组件。
+/// 消退绘制 — 纯渲染组件。
 /// 外部调用 Emit 输入点，每帧在 LateUpdate 中渲染到 RenderTexture。
 ///
 /// 用法：
 ///   var fading = gameObject.AddComponent<FadingStrokeLayer>();
-///   fading.target = rawImage;
 ///   fading.Emit(new Vector2(0.5f, 0.3f));
-///   // fading.texture 自动赋值给 target
 /// </summary>
 namespace DeviceViz
 {
@@ -26,22 +24,27 @@ namespace DeviceViz
         [SerializeField] float fadeDuration = 3f;
         [SerializeField] int maxPoints = 100000;
 
-        /// <summary>画好的纹理</summary>
-        public override Texture texture => rt;
+        // ─── Public ───────────────────────────
 
-        /// <summary>输入一个点 (UV 0~1)</summary>
+        public int CanvasWidth  { get { return canvasWidth; } }
+        public int CanvasHeight { get { return canvasHeight; } }
+
         public void Emit(Vector2 uv)
         {
+            if (records == null)
+                return;
             records[tail] = new Record { uv = uv, stamp = clock };
             tail = (tail + 1) % maxPoints;
             if (count < maxPoints) count++;
-            else head = (head + 1) % maxPoints; // 满则覆盖最旧的
+            else head = (head + 1) % maxPoints;
         }
 
-        /// <summary>FadingStrokeLayer ignores grid data — use Emit() instead.</summary>
+        // ─── VizLayer overrides ──────────────
+
+        public override bool needsTouches => true;
+
         public override void UpdateData(int[] newData, int width, int height) { }
 
-        /// <summary>Convert PressureInfo array to UV and emit stroke points.</summary>
         public override void UpdateTouches(PressureInfo[] touches, int width, int height)
         {
             if (touches == null || touches.Length == 0 || width <= 0 || height <= 0)
@@ -57,7 +60,6 @@ namespace DeviceViz
             }
         }
 
-        /// <summary>清空画布</summary>
         public override void Clear()
         {
             head = tail = count = 0;
@@ -65,27 +67,22 @@ namespace DeviceViz
             System.Array.Clear(records, 0, records.Length);
         }
 
-        // ── 内部 ────────────────────────────────────────────────
+        // ─── Internal ────────────────────────
 
         private struct Record { public Vector2 uv; public float stamp; }
         private Record[] records;
 
-        private int head;   // 最早有效记录的 index
-        private int tail;   // 下一个写入位置
-        private int count;  // 有效记录数
-
+        private int head, tail, count;
         private RenderTexture rt;
-        private Material      material;
+        private Material material;
         private ComputeBuffer buffer;
         private Vector3[] gpuData;
-        private float clock;
-        private float invFade; // 缓存 1 / fadeDuration
-
-        public int CanvasWidth { get { return canvasWidth; } }
-        public int CanvasHeight { get { return canvasHeight; } }
+        private RawImage _image;
+        private float clock, invFade;
 
         void Awake()
         {
+            _image = GetComponent<RawImage>();
             records = new Record[maxPoints];
             gpuData  = new Vector3[maxPoints];
             invFade  = 1f / fadeDuration;
@@ -103,8 +100,11 @@ namespace DeviceViz
             buffer = new ComputeBuffer(maxPoints, sizeof(float) * 3);
             material.SetBuffer("_PointBuffer", buffer);
 
-            if (_target) _target.texture = rt;
+            if (_image) _image.texture = rt;
         }
+
+        void OnEnable()  { if (_image) _image.enabled = true; }
+        void OnDisable() { if (_image) _image.enabled = false; }
 
         void OnDestroy()
         {
@@ -120,7 +120,6 @@ namespace DeviceViz
             clock += Time.deltaTime;
             float cutoff = clock - fadeDuration;
 
-            // 从头部淘汰过期记录（O(1) per record，无内存移位）
             while (count > 0 && records[head].stamp < cutoff)
             {
                 head = (head + 1) % maxPoints;
@@ -129,17 +128,12 @@ namespace DeviceViz
 
             if (count == 0) return;
 
-            // 单遍构建 GPU 数据（无需 Clamp01 — 过期记录已被移除）
             for (int i = 0; i < count; i++)
             {
                 int idx = (head + i) % maxPoints;
                 var r = records[idx];
                 float alpha = 1f - (clock - r.stamp) * invFade;
-                gpuData[i] = new Vector3(
-                    r.uv.x * canvasWidth,
-                    r.uv.y * canvasHeight,
-                    alpha
-                );
+                gpuData[i] = new Vector3(r.uv.x * canvasWidth, r.uv.y * canvasHeight, alpha);
             }
 
             buffer.SetData(gpuData, 0, 0, count);

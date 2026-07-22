@@ -19,13 +19,12 @@ namespace DeviceViz
         [Header("Render")]
         [SerializeField] private FilterMode _filterMode = FilterMode.Point;
 
+        private RawImage _image;
         private RenderTexture _rt;
         private Material _material;
         private Texture2D _dataTex;
         private Color[] _pixels;
         private int _width, _height;
-
-        public override Texture texture => _rt;
 
         public Color textColor
         {
@@ -33,9 +32,8 @@ namespace DeviceViz
             set { _textColor = value; if (_material) _material.SetColor("_TextColor", value); }
         }
 
-        // ─── Public API ──────────────────────
+        // ─── VizLayer overrides ──────────────
 
-        /// <summary>Upload raw data and encode to the internal data texture.</summary>
         public override void UpdateData(int[] data, int width, int height)
         {
             if (_width != width || _height != height)
@@ -45,11 +43,21 @@ namespace DeviceViz
                 CreateRT();
                 CreateDataTex();
             }
-            EncodeToTexture(data, _dataTex, _pixels, width, height);
+            EncodeToTexture(data);
         }
 
-        /// <summary>Render one frame to the output texture.</summary>
-        public void Render()
+        public override void Clear()
+        {
+            if (_rt == null) return;
+            var prev = RenderTexture.active;
+            RenderTexture.active = _rt;
+            GL.Clear(true, true, Color.clear);
+            RenderTexture.active = prev;
+        }
+
+        // ─── Public API ──────────────────────
+
+        public override void Render()
         {
             if (_material == null || _rt == null || _dataTex == null) return;
 
@@ -62,23 +70,16 @@ namespace DeviceViz
             RenderTexture.active = prev;
         }
 
-        public override void Clear()
-        {
-            if (_rt == null) return;
-            var prev = RenderTexture.active;
-            RenderTexture.active = _rt;
-            GL.Clear(true, true, Color.clear);
-            RenderTexture.active = prev;
-        }
-
         // ─── Internal ────────────────────────
 
         void Awake()
         {
+            _image = GetComponent<RawImage>();
+
             var shader = Resources.Load<Shader>("MatrixHeatmap_Digits");
             if (shader == null)
             {
-                Debug.LogError("DigitLayer: Hidden/MatrixHeatmap_Digits shader not found");
+                Debug.LogError("DigitLayer: MatrixHeatmap_Digits shader not found");
                 enabled = false;
                 return;
             }
@@ -88,6 +89,9 @@ namespace DeviceViz
             _material.SetTexture("_DigitAtlas", _digitAtlas);
             _material.SetColor("_TextColor", _textColor);
         }
+
+        void OnEnable()  { if (_image) _image.enabled = true; }
+        void OnDisable() { if (_image) _image.enabled = false; }
 
         void OnDestroy()
         {
@@ -125,23 +129,21 @@ namespace DeviceViz
                 _material.SetFloat("_CellGridSize", _width);
             }
 
-            if (_target) _target.texture = _rt;
+            if (_image) _image.texture = _rt;
         }
 
-        // ─── Encoding ────────────────────────
-
-        private static void EncodeToTexture(int[] source, Texture2D target, Color[] buffer, int width, int height)
+        void EncodeToTexture(int[] source)
         {
             float inv = 1f / 999f;
-            for (int r = 0; r < height; r++)
-                for (int c = 0; c < width; c++)
+            for (int r = 0; r < _height; r++)
+                for (int c = 0; c < _width; c++)
                 {
-                    int idx = r * width + c;
+                    int idx = r * _width + c;
                     int v = Mathf.Clamp(source[idx], 0, 999);
-                    buffer[idx] = new Color(v * inv, 0, 0, 0);
+                    _pixels[idx] = new Color(v * inv, 0, 0, 0);
                 }
-            target.SetPixels(buffer);
-            target.Apply();
+            _dataTex.SetPixels(_pixels);
+            _dataTex.Apply();
         }
 
     #if UNITY_EDITOR

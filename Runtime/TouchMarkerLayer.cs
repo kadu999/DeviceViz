@@ -14,18 +14,23 @@ namespace DeviceViz
         [SerializeField] private int _maxMarkers = 20;
         [SerializeField] private Color _markerColor = new Color(1, 0, 0, 1);
 
-        public override Texture texture => null;
-
         private RectTransform[] _markers;
         private Image[] _images;
         private static Sprite _circle;
 
         // ─── VizLayer overrides ──────────────
 
+        public override bool needsTouches => true;
+
         public override void UpdateData(int[] newData, int width, int height) { }
 
         public override void UpdateTouches(PressureInfo[] touches, int width, int height)
         {
+            if (_markers == null)
+            {
+                return;
+            }
+
             var rt = (RectTransform)transform;
             float scale = rt.rect.width / width;
 

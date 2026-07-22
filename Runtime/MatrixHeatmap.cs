@@ -1,12 +1,10 @@
 using DevicePipe;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace DeviceViz
 {
     /// <summary>
-    /// Matrix heatmap coordinator — manages display mode and
-    /// coordinates ColorLayer, DigitLayer, TouchMarkerLayer, and FadingStrokeLayer.
+    /// Matrix heatmap coordinator — manages display mode and coordinates all VizLayers.
     /// </summary>
     public class MatrixHeatmap : MonoBehaviour
     {
@@ -30,14 +28,9 @@ namespace DeviceViz
         [Header("显示")]
         public DisplayMode displayMode = DisplayMode.Color | DisplayMode.Digits;
 
-        [Header("颜色")]
-        public Color textColor = Color.white;
-
-        // ─── 公开属性 ─────────────────────────
-        public int gridW => _w;
-        public int gridH => _h;
 
         // ─── 私有 ─────────────────────────────
+        private VizLayer[] _layers;
         private int _w, _h;
         private bool _built;
         private DisplayMode _prevMode;
@@ -54,8 +47,12 @@ namespace DeviceViz
         void Awake()
         {
             _prevMode = displayMode;
-            if (touchMarkerLayer == null)
-                touchMarkerLayer = gameObject.AddComponent<TouchMarkerLayer>();
+            var list = new System.Collections.Generic.List<VizLayer>(4);
+            if (colorLayer) list.Add(colorLayer);
+            if (digitLayer) list.Add(digitLayer);
+            if (touchMarkerLayer) list.Add(touchMarkerLayer);
+            if (fadingLayer) list.Add(fadingLayer);
+            _layers = list.ToArray();
         }
 
         void Init(int w, int h)
@@ -65,36 +62,30 @@ namespace DeviceViz
             _w = w; _h = h;
             _built = true;
 
-            digitLayer.textColor = textColor;
-
-            colorLayer.transform.SetSiblingIndex(0);
-            digitLayer.transform.SetSiblingIndex(1);
-
             ApplyMode();
         }
 
         // ─── 渲染 ─────────────────────────────
 
-        void Render()
+        void RenderLayers()
         {
             if (!_built) return;
-            colorLayer.Render();
-            digitLayer.Render();
+            foreach (var l in _layers) l.Render();
         }
 
         // ─── 开关 ─────────────────────────────
 
         void ApplyMode()
         {
-            if (colorLayer) colorLayer.visible = displayMode.HasFlag(DisplayMode.Color);
-            if (digitLayer) digitLayer.visible = displayMode.HasFlag(DisplayMode.Digits);
+            if (colorLayer) colorLayer.enabled = displayMode.HasFlag(DisplayMode.Color);
+            if (digitLayer) digitLayer.enabled = displayMode.HasFlag(DisplayMode.Digits);
         }
 
         public void SetDisplayMode(DisplayMode mode)
         {
             displayMode = mode;
             ApplyMode();
-            if (_built) Render();
+            if (_built) RenderLayers();
         }
 
         // ─── 数据 ─────────────────────────────
@@ -104,25 +95,18 @@ namespace DeviceViz
             if (!_built || width != _w || height != _h)
                 Init(width, height);
 
-            colorLayer.UpdateData(newData, width, height);
-            digitLayer.UpdateData(newData, width, height);
-            Render();
+            foreach (var l in _layers) l.UpdateData(newData, width, height);
 
-            bool needTouches = displayMode.HasFlag(DisplayMode.TouchMarkers)
-                            || displayMode.HasFlag(DisplayMode.FadingStroke);
+            bool needTouches = false;
+            foreach (var l in _layers) { if (l.needsTouches) { needTouches = true; break; } }
+
             if (needTouches)
             {
                 var touches = PressureAnalyzer.GetPressureInfo(newData, width, height);
-                UpdateTouches(touches);
+                foreach (var l in _layers) l.UpdateTouches(touches, _w, _h);
             }
-        }
 
-        void UpdateTouches(PressureInfo[] touches)
-        {
-            if (displayMode.HasFlag(DisplayMode.TouchMarkers))
-                touchMarkerLayer.UpdateTouches(touches, _w, _h);
-            if (displayMode.HasFlag(DisplayMode.FadingStroke))
-                fadingLayer.UpdateTouches(touches, _w, _h);
+            RenderLayers();
         }
 
         void Cleanup()
