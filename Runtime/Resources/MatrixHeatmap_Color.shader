@@ -2,8 +2,7 @@ Shader "Hidden/MatrixHeatmap_Color"
 {
     Properties
     {
-        _ColorRamp ("Color Ramp", 2D) = "white" {}
-        _DataTex   ("Data Texture", 2D) = "black" {}
+        _DataTex ("Data Texture", 2D) = "black" {}
     }
     SubShader
     {
@@ -21,7 +20,6 @@ Shader "Hidden/MatrixHeatmap_Color"
             struct v2f    { float2 uv:TEXCOORD0; float4 vertex:SV_POSITION; };
 
             sampler2D _DataTex;
-            sampler2D _ColorRamp;
 
             v2f vert(appdata v) {
                 v2f o;
@@ -33,7 +31,8 @@ Shader "Hidden/MatrixHeatmap_Color"
             fixed4 frag(v2f i) : SV_Target
             {
                 float raw = tex2D(_DataTex, i.uv).r;
-                return fixed4(tex2D(_ColorRamp, float2(raw, 0.5)).rgb, 1);
+                float v = 1.0 - raw;
+                return fixed4(v, v, v, 1);
             }
             ENDCG
         }
