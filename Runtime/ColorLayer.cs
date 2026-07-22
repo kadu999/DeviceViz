@@ -24,8 +24,6 @@ namespace DeviceViz
 
         // ─── VizLayer overrides ──────────────
 
-        public override MatrixHeatmap.DisplayMode modeFlag => MatrixHeatmap.DisplayMode.Color;
-
         public override void UpdateData(int[] data, int width, int height)
         {
             if (_width != width || _height != height)
