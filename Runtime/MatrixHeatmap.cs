@@ -35,24 +35,22 @@ namespace DeviceViz
         private bool _built;
         private DisplayMode _prevMode;
 
-    #if UNITY_EDITOR
-        void OnValidate()
-        {
-            if (displayMode == _prevMode) return;
-            _prevMode = displayMode;
-            ApplyMode();
-        }
-    #endif
+    //#if UNITY_EDITOR
+    //    void OnValidate()
+    //    {
+    //        ApplyMode();
+    //    }
+    //#endif
 
         void Awake()
         {
-            _prevMode = displayMode;
             var list = new System.Collections.Generic.List<VizLayer>(4);
             if (colorLayer) list.Add(colorLayer);
             if (digitLayer) list.Add(digitLayer);
             if (touchMarkerLayer) list.Add(touchMarkerLayer);
             if (fadingLayer) list.Add(fadingLayer);
             _layers = list.ToArray();
+            ApplyMode();
         }
 
         void Init(int w, int h)
@@ -77,8 +75,10 @@ namespace DeviceViz
 
         void ApplyMode()
         {
-            if (colorLayer) colorLayer.enabled = displayMode.HasFlag(DisplayMode.Color);
-            if (digitLayer) digitLayer.enabled = displayMode.HasFlag(DisplayMode.Digits);
+            if (displayMode == _prevMode) return;
+            _prevMode = displayMode;
+            foreach (var l in _layers)
+                l.gameObject.SetActive(displayMode.HasFlag(l.modeFlag));
         }
 
         public void SetDisplayMode(DisplayMode mode)

@@ -41,6 +41,7 @@ namespace DeviceViz
 
         // ─── VizLayer overrides ──────────────
 
+        public override MatrixHeatmap.DisplayMode modeFlag => MatrixHeatmap.DisplayMode.FadingStroke;
         public override bool needsTouches => true;
 
         public override void UpdateData(int[] newData, int width, int height) { }

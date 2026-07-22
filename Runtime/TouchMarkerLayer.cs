@@ -20,6 +20,7 @@ namespace DeviceViz
 
         // ─── VizLayer overrides ──────────────
 
+        public override MatrixHeatmap.DisplayMode modeFlag => MatrixHeatmap.DisplayMode.TouchMarkers;
         public override bool needsTouches => true;
 
         public override void UpdateData(int[] newData, int width, int height) { }

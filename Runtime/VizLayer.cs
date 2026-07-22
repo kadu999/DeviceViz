@@ -9,6 +9,9 @@ namespace DeviceViz
     /// </summary>
     public abstract class VizLayer : MonoBehaviour
     {
+        /// <summary>Display mode flag that controls this layer.</summary>
+        public virtual MatrixHeatmap.DisplayMode modeFlag => MatrixHeatmap.DisplayMode.None;
+
         /// <summary>Whether this layer consumes touch pressure info.</summary>
         public virtual bool needsTouches => false;
 
