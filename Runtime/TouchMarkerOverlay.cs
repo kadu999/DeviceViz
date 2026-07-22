@@ -33,7 +33,7 @@ public class TouchMarkerOverlay
         return (rt, img);
     }
 
-    public void Update(DeviceDecoder.PressureInfo[] touches, int cols, int rows)
+    public void Update(DevicePipe.PressureInfo[] touches, int cols, int rows)
     {
         float w = ((RectTransform)_parent).rect.width;
         float scale = w / cols;

@@ -3,7 +3,7 @@
     "rootNamespace": "DeviceViz",
     "references": [
         "Unity.InputSystem",
-        "DeviceDecoder"
+        "DevicePipe"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
