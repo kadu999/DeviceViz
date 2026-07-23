@@ -89,7 +89,7 @@ namespace DeviceViz
             if (needTouches)
             {
                 var touches = PressureAnalyzer.GetPressureInfo(newData, width, height);
-                foreach (var l in _layers) l.UpdateTouches(touches, _w, _h);
+                foreach (var l in _layers) l.UpdateTouches(touches, width, height);
             }
 
             RenderLayers();
