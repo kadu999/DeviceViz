@@ -15,12 +15,14 @@ namespace DeviceViz
         public DigitLayer digitLayer;
         public FadingStrokeLayer fadingLayer;
         public TouchMarkerLayer touchMarkerLayer;
+        public ChessPieceLayer chessPieceLayer;
 
         [Header("Layer Toggles")]
         public bool showColor = true;
         public bool showDigits = true;
         public bool showTouchMarkers;
         public bool showFadingStroke;
+        public bool showChessPieces;
 
         [Header("UI")]
         public bool createUI = true;
@@ -32,11 +34,12 @@ namespace DeviceViz
 
         void Awake()
         {
-            var list = new System.Collections.Generic.List<VizLayer>(4);
+            var list = new System.Collections.Generic.List<VizLayer>(5);
             if (colorLayer) list.Add(colorLayer);
             if (digitLayer) list.Add(digitLayer);
             if (touchMarkerLayer) list.Add(touchMarkerLayer);
             if (fadingLayer) list.Add(fadingLayer);
+            if (chessPieceLayer) list.Add(chessPieceLayer);
             _layers = list.ToArray();
             ApplyMode();
         }
@@ -61,7 +64,8 @@ namespace DeviceViz
         void RenderLayers()
         {
             if (!_built) return;
-            foreach (var l in _layers) l.Render();
+            foreach (var l in _layers)
+                if (l.gameObject.activeInHierarchy) l.Render();
         }
 
         // ─── 开关 ─────────────────────────────
@@ -72,6 +76,7 @@ namespace DeviceViz
             if (digitLayer) digitLayer.gameObject.SetActive(showDigits);
             if (touchMarkerLayer) touchMarkerLayer.gameObject.SetActive(showTouchMarkers);
             if (fadingLayer) fadingLayer.gameObject.SetActive(showFadingStroke);
+            if (chessPieceLayer) chessPieceLayer.gameObject.SetActive(showChessPieces);
         }
 
         // ─── 数据 ─────────────────────────────
@@ -81,15 +86,29 @@ namespace DeviceViz
             if (!_built || width != _w || height != _h)
                 Init(width, height);
 
-            foreach (var l in _layers) l.UpdateData(newData, width, height);
+            foreach (var l in _layers)
+                if (l.gameObject.activeInHierarchy) l.UpdateData(newData, width, height);
 
             bool needTouches = false;
-            foreach (var l in _layers) { if (l.needsTouches) { needTouches = true; break; } }
+            foreach (var l in _layers)
+            { if (l.gameObject.activeInHierarchy && l.needsTouches) { needTouches = true; break; } }
 
             if (needTouches)
             {
                 var touches = PressureAnalyzer.GetPressureInfo(newData, width, height);
-                foreach (var l in _layers) l.UpdateTouches(touches, width, height);
+                foreach (var l in _layers)
+                    if (l.gameObject.activeInHierarchy) l.UpdateTouches(touches, width, height);
+            }
+
+            bool needPieces = false;
+            foreach (var l in _layers)
+            { if (l.gameObject.activeInHierarchy && l.needsPieces) { needPieces = true; break; } }
+
+            if (needPieces)
+            {
+                var pieces = PressureAnalyzer.GetChessPieceInfo(newData, width, height);
+                foreach (var l in _layers)
+                    if (l.gameObject.activeInHierarchy) l.UpdatePieces(pieces, width, height);
             }
 
             RenderLayers();
@@ -105,7 +124,7 @@ namespace DeviceViz
             prt.anchorMin = prt.anchorMax = new Vector2(1, 1);
             prt.pivot = new Vector2(0, 1);
             prt.anchoredPosition = Vector2.zero;
-            prt.sizeDelta = new Vector2(140, 160);
+            prt.sizeDelta = new Vector2(140, 190);
             prt.SetAsLastSibling();
             panel.GetComponent<Image>().color = new Color(0, 0, 0, 0.6f);
 
@@ -120,6 +139,7 @@ namespace DeviceViz
             AddToggle(panel.transform, "Digits", showDigits,       v => { showDigits = v; ApplyMode(); });
             AddToggle(panel.transform, "Touch",  showTouchMarkers, v => { showTouchMarkers = v; ApplyMode(); });
             AddToggle(panel.transform, "Fading", showFadingStroke, v => { showFadingStroke = v; ApplyMode(); });
+            AddToggle(panel.transform, "Pieces", showChessPieces,  v => { showChessPieces = v; ApplyMode(); });
         }
 
         void AddToggle(Transform parent, string label, bool initial, Action<bool> onChange)
