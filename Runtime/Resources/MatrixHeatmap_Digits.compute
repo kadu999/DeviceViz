@@ -1,0 +1,75 @@
+// One thread per output pixel (1024x1024). Reads the grid data buffer,
+// determines which cell the pixel falls in, extracts digits, and samples
+// the digit atlas — same logic as the old MatrixHeatmap_Digits fragment shader.
+
+#pragma kernel CSMain
+
+StructuredBuffer<int> DataBuffer;
+RWTexture2D<float4> Output;
+
+int Width;           // grid columns
+int Height;          // grid rows
+int OutputWidth;     // RT pixel width
+int OutputHeight;    // RT pixel height
+float4 TextColor;
+
+Texture2D<float4> DigitAtlas;
+SamplerState sampler_DigitAtlas;
+
+static const float ATLAS_W = 650.0;
+static const float DIGIT_W = 64.0;
+static const float GAP     = 1.0;
+static const float SLOT_W  = DIGIT_W + GAP;
+
+[numthreads(8,8,1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= OutputWidth || id.y >= OutputHeight) return;
+
+    float2 uv = (float2(id.xy) + 0.5) / float2(OutputWidth, OutputHeight);
+
+    float cx = uv.x * Width;
+    float cy = uv.y * Height;
+    int ix = (int)floor(cx);
+    int iy = (int)floor(cy);
+    float fx = cx - floor(cx);
+    float fy = cy - floor(cy);
+
+    // clamp to grid bounds
+    ix = clamp(ix, 0, Width - 1);
+    iy = clamp(iy, 0, Height - 1);
+
+    int dataIdx = iy * Width + ix;
+    uint val = (uint)clamp(DataBuffer[dataIdx], 0, 999);
+
+    uint d2 = val / 100;
+    uint d1 = (val / 10) % 10;
+    uint d0 = val % 10;
+
+    int num = (int)(val >= 100 ? 3 : (val >= 10 ? 2 : 1));
+    float slot  = 0.25;
+    float start = (1.0 - num * slot) / 2.0;
+    float p     = fx - start;
+    int col     = (int)(p / slot);
+
+    bool show = (p >= 0.0 && col >= 0 && col < num);
+
+    uint digit = 0;
+    if (show)
+    {
+        if (num == 3)      digit = col == 0 ? d2 : (col == 1 ? d1 : d0);
+        else if (num == 2) digit = col == 0 ? d1 : d0;
+        else               digit = d0;
+    }
+
+    float alpha = 0;
+    if (show)
+    {
+        float sx = saturate((p - col * slot) / slot);
+        float px = digit * SLOT_W + sx * DIGIT_W;
+        float a = DigitAtlas.SampleLevel(sampler_DigitAtlas, float2(px / ATLAS_W, fy), 0).a;
+        alpha = a > 0.5 ? 1.0 : 0.0;
+    }
+
+    Output[id.xy] = float4(TextColor.rgb, alpha);
+}

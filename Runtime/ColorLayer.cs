@@ -5,7 +5,7 @@ namespace DeviceViz
 {
     /// <summary>
     /// GPU-based color heatmap layer.
-    /// Encodes int[] data, uploads to a data texture, and renders via grayscale shader.
+    /// Uploads raw int[] via ComputeBuffer, renders to RenderTexture via ComputeShader.
     /// </summary>
     public class ColorLayer : VizLayer
     {
@@ -17,9 +17,12 @@ namespace DeviceViz
 
         private RawImage _image;
         private RenderTexture _rt;
-        private Material _material;
-        private Texture2D _dataTex;
-        private Color[] _pixels;
+
+        // Compute
+        private ComputeShader _cs;
+        private int _colorKernel;
+        private ComputeBuffer _dataBuffer;
+
         private int _width, _height;
 
         // ─── VizLayer overrides ──────────────
@@ -31,9 +34,9 @@ namespace DeviceViz
                 _width = width;
                 _height = height;
                 CreateRT();
-                CreateDataTex();
+                CreateBuffer(width * height);
             }
-            EncodeToTexture(data);
+            UploadData(data);
         }
 
         public override void Clear()
@@ -45,19 +48,19 @@ namespace DeviceViz
             RenderTexture.active = prev;
         }
 
-        // ─── Public API ──────────────────────
-
         public override void Render()
         {
-            if (_material == null || _rt == null || _dataTex == null) return;
+            if (_cs == null || _rt == null || _dataBuffer == null) return;
 
-            _material.SetTexture("_DataTex", _dataTex);
-
-            var prev = RenderTexture.active;
-            RenderTexture.active = _rt;
-            GL.Clear(true, true, Color.clear);
-            Graphics.Blit(_dataTex, _rt, _material);
-            RenderTexture.active = prev;
+            _cs.SetBuffer(_colorKernel, "DataBuffer", _dataBuffer);
+            _cs.SetTexture(_colorKernel, "Output", _rt);
+            _cs.SetInt("Width", _width);
+            _cs.SetInt("Height", _height);
+            _cs.SetFloat("InvMaxValue", 1f / Mathf.Max(1, _maxValue));
+            _cs.Dispatch(_colorKernel,
+                Mathf.CeilToInt(_width / 8f),
+                Mathf.CeilToInt(_height / 8f),
+                1);
         }
 
         // ─── Internal ────────────────────────
@@ -66,14 +69,14 @@ namespace DeviceViz
         {
             _image = GetComponent<RawImage>();
 
-            var shader = Resources.Load<Shader>("MatrixHeatmap_Color");
-            if (shader == null)
+            _cs = Resources.Load<ComputeShader>("MatrixHeatmap_Color");
+            if (_cs == null)
             {
-                Debug.LogError("ColorLayer: MatrixHeatmap_Color shader not found");
+                Debug.LogError("ColorLayer: MatrixHeatmap_Color compute shader not found");
                 enabled = false;
                 return;
             }
-            _material = new Material(shader);
+            _colorKernel = _cs.FindKernel("CSMain");
         }
 
         void OnEnable()  { if (_image) _image.enabled = true; }
@@ -81,20 +84,23 @@ namespace DeviceViz
 
         void OnDestroy()
         {
-            if (_material) Destroy(_material);
             if (_rt != null) { _rt.Release(); Destroy(_rt); }
-            if (_dataTex) { Destroy(_dataTex); _dataTex = null; }
+            ReleaseBuffer();
         }
 
-        void CreateDataTex()
+        void CreateBuffer(int count)
         {
-            if (_dataTex) { Destroy(_dataTex); _dataTex = null; }
-            _pixels = new Color[_width * _height];
-            _dataTex = new Texture2D(_width, _height, TextureFormat.RGBAFloat, false)
+            ReleaseBuffer();
+            _dataBuffer = new ComputeBuffer(count, sizeof(int));
+        }
+
+        void ReleaseBuffer()
+        {
+            if (_dataBuffer != null)
             {
-                filterMode = FilterMode.Point,
-                wrapMode = TextureWrapMode.Clamp
-            };
+                _dataBuffer.Release();
+                _dataBuffer = null;
+            }
         }
 
         void CreateRT()
@@ -104,29 +110,21 @@ namespace DeviceViz
             _rt = new RenderTexture(_width, _height, 0, RenderTextureFormat.ARGB32)
             {
                 filterMode = _filterMode,
-                wrapMode = TextureWrapMode.Clamp
+                wrapMode = TextureWrapMode.Clamp,
+                enableRandomWrite = true
             };
             _rt.Create();
 
             if (_image) _image.texture = _rt;
         }
 
-        void EncodeToTexture(int[] source)
+        void UploadData(int[] source)
         {
-            float inv = 1f / Mathf.Max(1, _maxValue);
-            for (int r = 0; r < _height; r++)
-                for (int c = 0; c < _width; c++)
-                {
-                    int idx = r * _width + c;
-                    int v = Mathf.Clamp(source[idx], 0, _maxValue);
-                    _pixels[idx] = new Color(v * inv, 0, 0, 0);
-                }
-            _dataTex.SetPixels(_pixels);
-            _dataTex.Apply();
+            _dataBuffer.SetData(source);
         }
 
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
         void OnValidate() { }
-    #endif
+#endif
     }
 }

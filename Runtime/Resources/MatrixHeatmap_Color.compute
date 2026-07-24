@@ -1,0 +1,25 @@
+// Each thread writes one pixel in the output RT (1:1 with grid cells).
+// Replaces the CPU encoding loop + Texture2D.SetPixels/Apply + Graphics.Blit.
+
+#pragma kernel CSMain
+
+StructuredBuffer<int> DataBuffer;
+RWTexture2D<float4> Output;
+
+int Width;
+int Height;
+float InvMaxValue;
+
+[numthreads(8,8,1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= Width || id.y >= Height) return;
+
+    int idx = id.y * Width + id.x;
+    int raw = DataBuffer[idx];
+
+    // high pressure = dark (same as old shader: v = 1 - raw)
+    float v = 1.0 - saturate(raw * InvMaxValue);
+
+    Output[id.xy] = float4(v, v, v, 1);
+}
