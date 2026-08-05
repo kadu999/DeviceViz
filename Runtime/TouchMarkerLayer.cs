@@ -39,6 +39,7 @@ namespace DeviceViz
                 if (i < touches.Length)
                 {
                     var t = touches[i];
+                    //UnityEngine.Debug.Log($"{t.x}, {t.y}");
                     _markers[i].anchoredPosition = new Vector2(t.y * scale, t.x * scale);
                     _markers[i].sizeDelta = Vector2.one * t.radius * 2f * scale;
                     _images[i].color = new Color(_markerColor.r, _markerColor.g, _markerColor.b, t.pressure / 100f);

@@ -52,11 +52,13 @@ namespace DeviceViz
 
             float invW = 1f / width;
             float invH = 1f / height;
+            //UnityEngine.Debug.Log($"[1] {width}, {height}");
 
             for (int i = 0; i < touches.Length; i++)
             {
                 var t = touches[i];
-                Emit(new Vector2(t.y * invH, t.x * invW));
+                //UnityEngine.Debug.Log($"[2] {t.x}, {t.y}");
+                Emit(new Vector2(t.y * invW, t.x * invH));
             }
         }
 

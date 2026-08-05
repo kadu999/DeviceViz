@@ -95,7 +95,7 @@ namespace DeviceViz
 
             if (needTouches)
             {
-                var touches = PressureAnalyzer.GetPressureInfo(newData, width, height);
+                var touches = PressureAnalyzer.GetPressureInfo(newData, height, width);
                 foreach (var l in _layers)
                     if (l.gameObject.activeInHierarchy) l.UpdateTouches(touches, width, height);
             }
@@ -106,7 +106,7 @@ namespace DeviceViz
 
             if (needPieces)
             {
-                var pieces = PressureAnalyzer.GetChessPieceInfo(newData, width, height);
+                var pieces = PressureAnalyzer.GetChessPieceInfo(newData, height, width);
                 foreach (var l in _layers)
                     if (l.gameObject.activeInHierarchy) l.UpdatePieces(pieces, width, height);
             }
