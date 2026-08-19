@@ -6,17 +6,19 @@ namespace DeviceViz
 {
     /// <summary>
     /// Touch marker overlay layer.
-    /// Renders pressure touch points as colored circles using UI Images.
+    /// Renders pressure touch points the same way ring_pressure_viewer.py does:
+    /// a hollow ring whose diameter follows the touch radius (stroke width fixed,
+    /// min radius 4px), a fixed white center dot, and per-touch colors taken from
+    /// an HSV palette cycled by index (touch list is sorted by pressure desc).
     /// </summary>
     public class TouchMarkerLayer : VizLayer
     {
         [Header("Markers")]
         [SerializeField] private int _maxMarkers = 20;
-        [SerializeField] private Color _markerColor = new Color(1, 0, 0, 1);
 
         private RectTransform[] _markers;
-        private Image[] _images;
-        private static Sprite _circle;
+        private RingGraphic[] _rings;
+        private Color[] _palette;
 
         // ─── VizLayer overrides ──────────────
 
@@ -39,10 +41,12 @@ namespace DeviceViz
                 if (i < touches.Length)
                 {
                     var t = touches[i];
-                    //UnityEngine.Debug.Log($"{t.x}, {t.y}");
                     _markers[i].anchoredPosition = new Vector2(t.y * scale, t.x * scale);
-                    _markers[i].sizeDelta = Vector2.one * t.radius * 2f * scale;
-                    _images[i].color = new Color(_markerColor.r, _markerColor.g, _markerColor.b, t.pressure / 100f);
+                    // python: radius = max(int(r * scale), 4) → diameter = 2 * radius
+                    float diameter = Mathf.Max(t.radius * 2f * scale, 8f);
+                    _markers[i].sizeDelta = Vector2.one * diameter;
+                    // python: color = traj_colors[i % MAX_TRACKS] (opaque)
+                    _rings[i].color = _palette[i % _palette.Length];
                     _markers[i].gameObject.SetActive(true);
                 }
                 else
@@ -63,45 +67,34 @@ namespace DeviceViz
 
         void Awake()
         {
-            _markers = new RectTransform[_maxMarkers];
-            _images = new Image[_maxMarkers];
+            // python traj_colors: HSV(h = i / MAX_TRACKS, 255, 255) → BGR
+            _palette = new Color[_maxMarkers];
             for (int i = 0; i < _maxMarkers; i++)
-                (_markers[i], _images[i]) = CreateMarker(i);
+                _palette[i] = Color.HSVToRGB(i / (float)_maxMarkers, 1f, 1f);
+
+            _markers = new RectTransform[_maxMarkers];
+            _rings = new RingGraphic[_maxMarkers];
+            for (int i = 0; i < _maxMarkers; i++)
+                (_markers[i], _rings[i]) = CreateMarker(i);
         }
 
-        (RectTransform, Image) CreateMarker(int i)
+        (RectTransform, RingGraphic) CreateMarker(int i)
         {
-            var go = new GameObject($"Touch{i}", typeof(RectTransform), typeof(Image));
+            var go = new GameObject($"Touch{i}",
+                                    typeof(RectTransform),
+                                    typeof(CanvasRenderer),
+                                    typeof(RingGraphic));
             go.transform.SetParent(transform, false);
             go.transform.SetAsLastSibling();
-            var img = go.GetComponent<Image>();
-            img.sprite = CircleSprite;
+            var ring = go.GetComponent<RingGraphic>();
+            ring.raycastTarget = false;
+            // python: cv2.circle(overlay, center, 3, (255,255,255), -1) — white center dot
+            ring.DrawCenterDot = true;
             var rt = go.GetComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = Vector2.zero;
             rt.pivot = new Vector2(0.5f, 0.5f);
             go.SetActive(false);
-            return (rt, img);
-        }
-
-        static Sprite CircleSprite
-        {
-            get
-            {
-                if (_circle == null)
-                {
-                    int s = 64;
-                    var tex = new Texture2D(s, s, TextureFormat.RGBA32, false);
-                    var colors = new Color[s * s];
-                    float r = s / 2f;
-                    for (int y = 0; y < s; y++)
-                        for (int x = 0; x < s; x++)
-                            colors[y * s + x] = (x - r) * (x - r) + (y - r) * (y - r) <= r * r ? Color.white : Color.clear;
-                    tex.SetPixels(colors);
-                    tex.Apply();
-                    _circle = Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f));
-                }
-                return _circle;
-            }
+            return (rt, ring);
         }
     }
 }

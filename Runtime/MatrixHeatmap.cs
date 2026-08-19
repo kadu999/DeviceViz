@@ -27,6 +27,9 @@ namespace DeviceViz
         [Header("UI")]
         public bool createUI = true;
 
+
+        public bool enableFilter = false;
+
         // ─── 私有 ─────────────────────────────
         private VizLayer[] _layers;
         private int _w, _h;
@@ -95,7 +98,7 @@ namespace DeviceViz
 
             if (needTouches)
             {
-                var touches = PressureAnalyzer.GetPressureInfo(newData, width, height);
+                var touches = PressureAnalyzer.GetPressureInfo(newData, width, height, RadiusMode.Direction, enableFilter);
                 foreach (var l in _layers)
                     if (l.gameObject.activeInHierarchy) l.UpdateTouches(touches, width, height);
             }
