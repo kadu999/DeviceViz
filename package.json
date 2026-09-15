@@ -1,11 +1,11 @@
 {
   "name": "com.kadu999.device-viz",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "displayName": "DeviceViz",
   "description": "Matrix heatmap visualization — color map, digit overlay, touch markers, and fading stroke trails.",
   "unity": "2022.3",
   "dependencies": {
-    "com.kadu999.device-pipe": "1.0.0"
+    "com.kadu999.device-pipe": "2.0.0"
   },
   "author": {
     "name": "kadu999",
