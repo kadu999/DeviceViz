@@ -109,7 +109,7 @@ namespace DeviceViz
 
             if (needPieces)
             {
-                var pieces = PressureAnalyzer.GetChessPieceInfo(newData, width, height);
+                var pieces = PressureAnalyzer.GetPieceInfo(newData, width, height);
                 foreach (var l in _layers)
                     if (l.gameObject.activeInHierarchy) l.UpdatePieces(pieces, width, height);
             }
