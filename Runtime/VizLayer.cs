@@ -15,9 +15,13 @@ namespace DeviceViz
         /// <summary>Whether this layer consumes piece info.</summary>
         public virtual bool needsPieces => false;
 
+        /// <summary>Whether this layer consumes T-shaped stamp info.</summary>
+        public virtual bool needsTShapes => false;
+
         public abstract void UpdateData(int[] newData, int width, int height);
         public virtual void UpdateTouches(PressureInfo[] touches, int width, int height) { }
         public virtual void UpdatePieces(PieceInfo[] pieces, int width, int height) { }
+        public virtual void UpdateTShapes(TShapeInfo[] shapes, int width, int height) { }
         public virtual void Render() { }
         public abstract void Clear();
     }

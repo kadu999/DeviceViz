@@ -16,6 +16,7 @@ namespace DeviceViz
         public FadingStrokeLayer fadingLayer;
         public TouchMarkerLayer touchMarkerLayer;
         public ChessPieceLayer chessPieceLayer;
+        public TShapeLayer tShapeLayer;
 
         [Header("Layer Toggles")]
         public bool showColor = true;
@@ -23,6 +24,11 @@ namespace DeviceViz
         public bool showTouchMarkers;
         public bool showFadingStroke;
         public bool showChessPieces = true;
+
+        // T-shaped stamps (印章) carry the 4-bit piece identity.  Left ON so the
+        // stamp exclusion mask is built every frame, matching the python viewer
+        // where show_tshapes defaults to True.
+        public bool showTShapes = true;
 
         [Header("UI")]
         public bool createUI = true;
@@ -40,14 +46,32 @@ namespace DeviceViz
 
         void Awake()
         {
-            var list = new System.Collections.Generic.List<VizLayer>(5);
+            // Created on demand so the MatrixHeatmap prefab does not have to be
+            // re-authored just to gain the stamp layer.
+            if (tShapeLayer == null) tShapeLayer = CreateTShapeLayer();
+
+            var list = new System.Collections.Generic.List<VizLayer>(6);
             if (colorLayer) list.Add(colorLayer);
             if (digitLayer) list.Add(digitLayer);
             if (touchMarkerLayer) list.Add(touchMarkerLayer);
             if (fadingLayer) list.Add(fadingLayer);
             if (chessPieceLayer) list.Add(chessPieceLayer);
+            if (tShapeLayer) list.Add(tShapeLayer);
             _layers = list.ToArray();
             ApplyMode();
+        }
+
+        TShapeLayer CreateTShapeLayer()
+        {
+            var go = new GameObject("TShapeLayer", typeof(RectTransform), typeof(TShapeLayer));
+            go.transform.SetParent(transform, false);
+            go.transform.SetAsLastSibling();
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero;      // stretch like the other overlay layers
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+            return go.GetComponent<TShapeLayer>();
         }
 
         void Start()
@@ -61,6 +85,10 @@ namespace DeviceViz
 
             _w = w; _h = h;
             _built = true;
+
+            // Resolution changed (or first frame): the stamp detector's temporal EMA
+            // and exclusion mask belong to the previous stream.
+            TShapeDetector.ResetState();
 
             ApplyMode();
         }
@@ -83,6 +111,8 @@ namespace DeviceViz
             if (touchMarkerLayer) touchMarkerLayer.gameObject.SetActive(showTouchMarkers);
             if (fadingLayer) fadingLayer.gameObject.SetActive(showFadingStroke);
             if (chessPieceLayer) chessPieceLayer.gameObject.SetActive(showChessPieces);
+            if (tShapeLayer) tShapeLayer.gameObject.SetActive(showTShapes);
+            TShapeDetector.Enabled = showTShapes;
         }
 
         // ─── 数据 ─────────────────────────────
@@ -94,6 +124,23 @@ namespace DeviceViz
 
             foreach (var l in _layers)
                 if (l.gameObject.activeInHierarchy) l.UpdateData(newData, width, height);
+
+            // ── Stamps first. ──
+            // Two reasons this must precede the touch and piece passes:
+            //   1. its exclusion mask is consulted by both (python :659-662);
+            //   2. the detector keeps a temporal EMA, and this is the single
+            //      per-frame call that contract allows.
+            var tShapes = TShapeDetector.GetTShapes(newData, width, height);
+
+            bool needTShapes = false;
+            foreach (var l in _layers)
+            { if (l.gameObject.activeInHierarchy && l.needsTShapes) { needTShapes = true; break; } }
+
+            if (needTShapes)
+            {
+                foreach (var l in _layers)
+                    if (l.gameObject.activeInHierarchy) l.UpdateTShapes(tShapes, width, height);
+            }
 
             bool needTouches = false;
             foreach (var l in _layers)
@@ -130,7 +177,7 @@ namespace DeviceViz
             prt.anchorMin = prt.anchorMax = new Vector2(1, 1);
             prt.pivot = new Vector2(0, 1);
             prt.anchoredPosition = Vector2.zero;
-            prt.sizeDelta = new Vector2(140, 190);
+            prt.sizeDelta = new Vector2(140, 220);
             prt.SetAsLastSibling();
             panel.GetComponent<Image>().color = new Color(0, 0, 0, 0.6f);
 
@@ -146,6 +193,7 @@ namespace DeviceViz
             AddToggle(panel.transform, "Touch",  showTouchMarkers, v => { showTouchMarkers = v; ApplyMode(); });
             AddToggle(panel.transform, "Fading", showFadingStroke, v => { showFadingStroke = v; ApplyMode(); });
             AddToggle(panel.transform, "Pieces", showChessPieces,  v => { showChessPieces = v; ApplyMode(); });
+            AddToggle(panel.transform, "Stamps", showTShapes,      v => { showTShapes = v; ApplyMode(); });
         }
 
         void AddToggle(Transform parent, string label, bool initial, Action<bool> onChange)
