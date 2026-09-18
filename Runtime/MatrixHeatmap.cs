@@ -30,6 +30,17 @@ namespace DeviceViz
         // where show_tshapes defaults to True.
         public bool showTShapes = true;
 
+        // ── Touch / pressure path: intentionally masked, NOT removed ──────────
+        // The pipeline now keys off T-shaped stamps and circular pieces, so the touch
+        // filter chain (PressureAnalyzer.GetPressureInfo) is no longer driven.  The
+        // runtime "Touch" toggle sets this together with showTouchMarkers, so clicking
+        // it brings the whole feature back — nothing was deleted, DevicePipe still
+        // carries the complete implementation.
+        //
+        // Note this also skips the piece-detection pass GetPressureInfo runs internally
+        // to exclude touches inside pieces (FilterExcludeInsidePieces).
+        public bool enableTouchDetection = false;
+
         [Header("UI")]
         public bool createUI = true;
 
@@ -146,7 +157,9 @@ namespace DeviceViz
             foreach (var l in _layers)
             { if (l.gameObject.activeInHierarchy && l.needsTouches) { needTouches = true; break; } }
 
-            if (needTouches)
+            // Masked: see enableTouchDetection.  The code is kept so the touch path can
+            // be restored by flipping the flag (plus the Touch layer toggle).
+            if (needTouches && enableTouchDetection)
             {
                 var touches = PressureAnalyzer.GetPressureInfo(newData, width, height, RadiusMode.Direction, enableFilter);
                 foreach (var l in _layers)
@@ -190,7 +203,7 @@ namespace DeviceViz
 
             AddToggle(panel.transform, "Color",  showColor,        v => { showColor = v; ApplyMode(); });
             AddToggle(panel.transform, "Digits", showDigits,       v => { showDigits = v; ApplyMode(); });
-            AddToggle(panel.transform, "Touch",  showTouchMarkers, v => { showTouchMarkers = v; ApplyMode(); });
+            AddToggle(panel.transform, "Touch",  showTouchMarkers, v => { showTouchMarkers = v; enableTouchDetection = v; ApplyMode(); });
             AddToggle(panel.transform, "Fading", showFadingStroke, v => { showFadingStroke = v; ApplyMode(); });
             AddToggle(panel.transform, "Pieces", showChessPieces,  v => { showChessPieces = v; ApplyMode(); });
             AddToggle(panel.transform, "Stamps", showTShapes,      v => { showTShapes = v; ApplyMode(); });
