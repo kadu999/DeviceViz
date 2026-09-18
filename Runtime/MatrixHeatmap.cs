@@ -22,13 +22,16 @@ namespace DeviceViz
         public bool showDigits = true;
         public bool showTouchMarkers;
         public bool showFadingStroke;
-        public bool showChessPieces;
+        public bool showChessPieces = true;
 
         [Header("UI")]
         public bool createUI = true;
 
 
-        public bool enableFilter = false;
+        // ON by default: matches the python viewer's render pipeline — touch
+        // detection uses threshold 12 and touches inside detected piece
+        // circles are excluded, so pieces and touches stay visually distinct.
+        public bool enableFilter = true;
 
         // ─── 私有 ─────────────────────────────
         private VizLayer[] _layers;

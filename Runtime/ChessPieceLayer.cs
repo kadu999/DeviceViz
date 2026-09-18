@@ -6,21 +6,30 @@ namespace DeviceViz
 {
     /// <summary>
     /// Chess piece visualization layer.
-    /// Renders detected solid pieces as orange circles sized by piece radius.
+    /// Renders detected solid pieces as orange circles sized by piece radius,
+    /// with the stable tracker ID drawn at the piece center.
     /// (Ring/ellipse rendering was removed together with ring detection in DevicePipe.)
     /// </summary>
     public class ChessPieceLayer : VizLayer
     {
         [Header("Pieces")]
         [SerializeField] private int _maxPieces = 20;
+        [SerializeField] private int _idFontSize = 13;
 
         private RectTransform[] _circles;
         private Image[] _circleImages;
         private RectTransform[] _centers;
         private Image[] _centerImages;
+        private RectTransform[] _idRects;
+        private Text[] _idTexts;
+
+        // Per-slot state to avoid redundant native calls / text mesh rebuilds
+        private bool[] _slotActive;
+        private int[] _lastIds;
 
         private static Sprite _circleSprite;
         private static Sprite _centerSprite;
+        private static Font _font;
 
         // ─── VizLayer overrides ──────────────
 
@@ -34,34 +43,41 @@ namespace DeviceViz
 
             var rt = (RectTransform)transform;
             float scale = rt.rect.width / width;
+            int count = pieces?.Length ?? 0;
 
             for (int i = 0; i < _maxPieces; i++)
             {
-                if (i < (pieces?.Length ?? 0))
+                bool active = i < count;
+                if (active != _slotActive[i])
                 {
-                    var p = pieces[i];
-
-                    // Sensor coords → UI coords (x/y swap matching TouchMarkerLayer)
-                    float uix = p.pos_y * scale;
-                    float uiy = p.pos_x * scale;
-
-                    // ── Piece body: orange circle, diameter = 2 × radius ──
-                    _circles[i].anchoredPosition = new Vector2(uix, uiy);
-                    _circles[i].sizeDelta = Vector2.one * (p.radius * 2f * scale);
-                    _circleImages[i].color = new Color(1f, 0.65f, 0f, 0.7f);
-                    _circles[i].gameObject.SetActive(true);
-
-                    // ── Center: yellow dot ──
-                    _centers[i].anchoredPosition = new Vector2(uix, uiy);
-                    float dotSize = Mathf.Max(6f, p.radius * scale * 0.5f);
-                    _centers[i].sizeDelta = Vector2.one * dotSize;
-                    _centerImages[i].color = new Color(1f, 1f, 0f, 0.9f);
-                    _centers[i].gameObject.SetActive(true);
+                    _slotActive[i] = active;
+                    _circles[i].gameObject.SetActive(active);
+                    _centers[i].gameObject.SetActive(active);
+                    _idRects[i].gameObject.SetActive(active);
                 }
-                else
+                if (!active) continue;
+
+                var p = pieces[i];
+
+                // Sensor coords → UI coords (x/y swap matching TouchMarkerLayer)
+                float uix = p.pos_y * scale;
+                float uiy = p.pos_x * scale;
+
+                // ── Piece body: orange circle, diameter = 2 × radius ──
+                _circles[i].anchoredPosition = new Vector2(uix, uiy);
+                _circles[i].sizeDelta = Vector2.one * (p.radius * 2f * scale);
+                _circleImages[i].color = CircleColor(p.radius);
+
+                // ── Center: yellow dot ──
+                _centers[i].anchoredPosition = new Vector2(uix, uiy);
+                _centers[i].sizeDelta = Vector2.one * Mathf.Max(6f, p.radius * scale * 0.5f);
+
+                // ── ID label (skip text reset when unchanged — avoids mesh rebuild) ──
+                _idRects[i].anchoredPosition = new Vector2(uix, uiy);
+                if (_lastIds[i] != p.id)
                 {
-                    _circles[i].gameObject.SetActive(false);
-                    _centers[i].gameObject.SetActive(false);
+                    _lastIds[i] = p.id;
+                    _idTexts[i].text = p.id.ToString();
                 }
             }
         }
@@ -71,8 +87,11 @@ namespace DeviceViz
             if (_circles == null) return;
             for (int i = 0; i < _maxPieces; i++)
             {
+                _slotActive[i] = false;
                 if (_circles[i]) _circles[i].gameObject.SetActive(false);
                 if (_centers[i]) _centers[i].gameObject.SetActive(false);
+                if (_idRects[i]) _idRects[i].gameObject.SetActive(false);
+                _lastIds[i] = 0;
             }
         }
 
@@ -83,31 +102,57 @@ namespace DeviceViz
 
         void Awake()
         {
+            if (_font == null) _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
             _circles = new RectTransform[_maxPieces];
             _circleImages = new Image[_maxPieces];
             _centers = new RectTransform[_maxPieces];
             _centerImages = new Image[_maxPieces];
+            _idRects = new RectTransform[_maxPieces];
+            _idTexts = new Text[_maxPieces];
+            _slotActive = new bool[_maxPieces];
+            _lastIds = new int[_maxPieces];
 
             for (int i = 0; i < _maxPieces; i++)
             {
-                (_circles[i], _circleImages[i]) = CreateChild($"Piece{i}_Circle", CircleSprite);
-                (_centers[i], _centerImages[i]) = CreateChild($"Piece{i}_Center", CenterSprite);
+                (_circles[i], _circleImages[i]) = CreateChild<Image>($"Piece{i}_Circle", CircleSprite);
+                (_centers[i], _centerImages[i]) = CreateChild<Image>($"Piece{i}_Center", CenterSprite);
+                (_idRects[i], _idTexts[i]) = CreateChild<Text>($"Piece{i}_Id", null);
+                _idTexts[i].text = "";
+                _idTexts[i].font = _font;
+                _idTexts[i].fontSize = _idFontSize;
+                _idTexts[i].color = Color.white;
+                _idTexts[i].alignment = TextAnchor.MiddleCenter;
+                // Same anchor setup as the circle (CreateChild anchors at bottom-left),
+                // with a small explicit rect — Stretch() would anchor to the panel center
+                // and the label would land half a panel away from the piece.
+                _idRects[i].sizeDelta = new Vector2(40f, 20f);
             }
         }
 
-        (RectTransform, Image) CreateChild(string name, Sprite sprite)
+        // Slightly vary orange by radius so overlapping pieces are easier to tell apart
+        static Color CircleColor(float radius)
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+            float t = Mathf.Clamp01((radius - 4f) / 10f);
+            return new Color(1f, 0.75f - 0.25f * t, 0.1f, 0.7f);
+        }
+
+        (RectTransform, T) CreateChild<T>(string name, Sprite sprite) where T : Component
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(T));
             go.transform.SetParent(transform, false);
             go.transform.SetAsLastSibling();
-            var img = go.GetComponent<Image>();
-            img.sprite = sprite;
-            img.raycastTarget = false;
+            var comp = go.GetComponent<T>();
+            if (comp is Graphic g)
+            {
+                g.raycastTarget = false;
+                if (sprite != null && comp is Image img) img.sprite = sprite;
+            }
             var rect = go.GetComponent<RectTransform>();
             rect.anchorMin = rect.anchorMax = Vector2.zero;
             rect.pivot = new Vector2(0.5f, 0.5f);
             go.SetActive(false);
-            return (rect, img);
+            return (rect, comp);
         }
 
         // ─── Procedural sprites ──────────────
